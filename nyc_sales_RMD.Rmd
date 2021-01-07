@@ -1,0 +1,99 @@
+---
+title: "NYC Sales Project"
+author: "Anshuman Dash"
+date: "1/6/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1. Introduction:
+
+Machine Learning has many different applications. One application is in the use of prediction models, specifically predicting property sales. For my project I'll be using the "NYC Property Sales" data set. This data set contains one year of property sales in NYC accross 2016-2017. This data set contains over 84000 sales with 22 variables. These variables help describe and classify the sales. For example we can get the sale price, date of sale, the borough, zipcode, and a lot more. But in the scope of this project we want to try to predict the sale price using only a few of the variables. 
+
+For this project we will be using two primary models, the first a simple linear regression model and the second is a decision tree model. The linear regression model's goals is to create an overall prediction model, while using the decision tree to find good predictor variables and see how our data split based on probabilites from the decision trees. 
+
+Overall for this project we will download and clean up the data for analysis. Then we'll begin with developing our linear regression. We'll try to identify variables best suited to help predict the sales price, then we'll incorporate them into our model and check the RMSE. Then we'll develop a decision tree using the "ANOVA" method.  
+  
+### 2. Methods/Analysis:
+
+Our methodology can be broken down into a few key stages. The first stage is downloading the data and cleaning it up for later use. We then shape our data by filtering out unnecessary data that we don't need. We also drop NA's and create additioinal columns to help analyze some of our categorical data. The next stage is to create our linear regression models using the "lm()" function. We use a correlation matrix to identify variables that will aid in predicting sale prices. We'll slowly test a few models and then use the "train()" function to train a linear model and use cross-validation to see which one was the best. 
+
+Our final step is to create a decision tree using the "rpart()" function, and specifically the "ANOVA" method. We then view the tree using the "rpart.plot()" function.  
+
+We will begin by downloading and processing the data for analysis later. 
+
+## 2.2 Data Ingestion/Pre-Processing:
+
+We'll begin by downloading any libraries we may need, then reading the csv file containing our data. Then we'll clean it up by reformatting it for easier refernce, readability, and analysis. 
+
+
+```{r download, message=FALSE, warning=FALSE, echo=FALSE}
+
+# Download required libraries for the project
+# Not all libraries are required as I had to reduce the scope of my project due to my own limitations. But it is best to download them all just in case. 
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(magrittr)) install.packages("magrittr")
+if(!require(stringr)) install.packages("stringr")
+if(!require(dplyr)) install.packages("dplyr")
+if(!require(readr)) install.packages("readr")
+if(!require(ggplot2)) install.packages("ggplot2")
+if(!require(tidyr)) install.packages("tidyr")
+if(!require(nortest)) install.packages("nortest")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(epiDisplay)) install.packages("epiDisplay")
+if(!require(rpart)) install.packages("rpart")
+if(!require(rpart.plot)) install.packages("rpart.plot")
+if(!require(vip)) install.packages("vip")
+if(!require(pdp)) install.packages("pdp")
+
+library(tidyverse)
+library(magrittr) 
+library(stringr)
+library(dplyr) 
+library(readr)
+library(ggplot2) 
+library(tidyr) 
+library(nortest)
+library(caret) 
+library(epiDisplay)
+library(rpart)
+library(rpart.plot)
+library(vip)
+library(pdp)
+
+
+### Load Data/Data Overview ###
+nyc_data <- read_csv("nyc-rolling-sales.csv")
+
+```
+
+Here I assign the csv data to nyc_data, then make sure all my columns are lowecase and have no spaces in the names.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+### Data Pre-Processing
+## Organizing and Formatting Data
+# Make data easier to process and reference by making everything lowercase and replacing spaces with "_"
+colnames(nyc_data) %<>% str_replace_all("\\s", "_") %>% tolower()
+
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+# Drop and NA values in the columns that we care about; gross_square_feet,land_square_feet, and sale_price
+nyc_data <- nyc_data %>% distinct() %>% drop_na(c(gross_square_feet,land_square_feet, sale_price))
+
+# Make gross_square_feet,land_square_feet, and sale_price numerical values for easier analysis
+nyc_data$sale_price <- as.numeric(nyc_data$sale_price)
+nyc_data$land_square_feet <- as.numeric(nyc_data$land_square_feet)
+nyc_data$gross_square_feet <- as.numeric(nyc_data$gross_square_feet)
+
+# Remove all NA's that were made by coercion from "as.numeric"
+nyc_data <- nyc_data %>% distinct() %>% drop_na(c(gross_square_feet,land_square_feet, sale_price))
+
+```
+
+
+Now that the data is in a 
