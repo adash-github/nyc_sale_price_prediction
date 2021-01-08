@@ -65,21 +65,25 @@ library(rpart.plot)
 library(vip)
 library(pdp)
 
+set.seed(1996) # Help in reproducibility 
 
 ### Load Data/Data Overview ###
 nyc_data <- read_csv("nyc-rolling-sales.csv")
+str(nyc_data)
+head(nyc_data)
 
 ```
+I stored the csv data in nyc_data. When we take a look at nyc_data we notice the column names are all uppercase and have spaces in them, this is tough to reference and analyze. So I'll go ahead and make it all lowercase and replace the spaces with underscores.
 
-Here I assign the csv data to nyc_data, then make sure all my columns are lowecase and have no spaces in the names.
-
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 ### Data Pre-Processing
 ## Organizing and Formatting Data
 # Make data easier to process and reference by making everything lowercase and replacing spaces with "_"
 colnames(nyc_data) %<>% str_replace_all("\\s", "_") %>% tolower()
 
 ```
+
+Now that the data is easier to read, we'll go ahead make the sale_price, land_square_feet, and gross_square_feet columns numerical so we can model them. Then we'll drop any NA's that were made by coercion from as.numeric(). 
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 # Drop and NA values in the columns that we care about; gross_square_feet,land_square_feet, and sale_price
@@ -96,4 +100,332 @@ nyc_data <- nyc_data %>% distinct() %>% drop_na(c(gross_square_feet,land_square_
 ```
 
 
-Now that the data is in a 
+Now it's time to take a look at our interested columns sale_price, gross_square_feet, and land_square_feet. We'll create some frequency tables for each and see if their is anything going on, or if can proceed to modelling. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+## Analayze initial data and remove Outliers
+# We'll take a look at sale prices to see if their is anything wrong
+# For example because property prices are very high in NYC we want to remove any low sale prices
+# We'll take a look at the data and see what the frequency of sales
+# We'll take a look at sale_price, land_square_feet and gross_square_feet
+# We want to look at Square feet to find housing that we deem too small of people to live in
+
+# Generate Frequence tables for each variable
+
+freq_sale_price <- nyc_data %>% group_by(sale_price) %>% summarize(Freq = n())
+freq_land_square_feet <- nyc_data %>% group_by(land_square_feet) %>% summarize(Freq = n())
+freq_gross_square_feet <- nyc_data %>% group_by(gross_square_feet) %>% summarize(Freq = n())
+
+freq_gross_square_feet
+freq_land_square_feet
+freq_sale_price
+
+# We quickly see a few issues, first with both gross_square_feet and land_square_feet
+# There are some really small plots (<100 square feet), we'll want to deal with them
+# With sale price, their are over 10,000 sales of $0, we will want to filter them too
+
+```
+
+What we notice from our frequency tables is that we have over 10,000 sales of $0 and quite a few sales that are less than $100,000. This is NYC where property prices are expensive, we will use $100,000 as our cutoff. Additionally for both land_square_feet and gross_square_feet we don't want anything less than 100 square feet since we'll deem the smaller spaces as uninhabitable for our study. So we'll go ahead and filter out sales under $100,000, and square feet under 100.   
+  
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+
+# Filter Unwanted Data
+
+nyc_data <- nyc_data %>% filter(land_square_feet>100) %>% filter(gross_square_feet>100) %>% filter(sale_price >100000)
+
+```
+
+
+If we take a look at the borough column, we notice that they have an integer value in the range of 1-5. These numbers have a real world meaning, 1 = Manhatten, 2 = Bronx, 3 = Brooklyn, 4 = Queens, and 5 = Staten Island. We don't just want borogh identity to be stuck in this column, we want to create individual columns that will state whether the property is in the borough. This will be important later to identify correlation between the boroughs and sale_price. Additionally this will help identify any collinearity problems. We'll go ahead and add those columns now. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+## Numerical Identification of Catergorical Data
+#unique(nyc_data$borough)
+# The Data Set uses these identifications for the borough variable
+# 1 = Manhattan
+# 2 = Bronx
+# 3 = Brooklyn
+# 4 = Queens 
+# 5 = Staten Island
+
+# Our goal is to create columns for each borough that acts as an indentifier for each borough
+
+nyc_data$in_manhattan <- ifelse(nyc_data$borough == 1 , 1, 0 )
+nyc_data$in_bronx <- ifelse(nyc_data$borough == 2 , 1, 0 )
+nyc_data$in_brooklyn <- ifelse(nyc_data$borough == 3 , 1, 0 )
+nyc_data$in_queens <- ifelse(nyc_data$borough == 4, 1, 0 )
+nyc_data$in_staten_island <- ifelse(nyc_data$borough == 5, 1, 0 )
+head(nyc_data)
+
+nyc_data$tax_class_one <- ifelse(nyc_data$tax_class_at_time_of_sale==1,1,0)
+nyc_data$tax_class_two <- ifelse(nyc_data$tax_class_at_time_of_sale==2,1,0)
+nyc_data$tax_class_four <- ifelse(nyc_data$tax_class_at_time_of_sale==4,1,0)
+
+# We are ignoring tax_class_three because they are owned by gas, telephone, and/or electric companies
+# We will consider them public utilities companies and don't want to consider their sales
+
+hist(nyc_data$borough)
+hist(nyc_data$tax_class_at_time_of_sale)
+nyc_data %>% filter()
+print(nyc_data %>% group_by(building_class_category) %>% summarize(freq = n()))
+# This will help identify possible colinearity in our correlation matrix later on
+
+```
+
+We now five additional columns with in_boroughname for each borough, which will be very important when looking at the correlation matrix. We also added 3 additioinal columns specifying what tax class each property had at the time of the sale. It's important that we have this info to help us Before we create our correlation matrix, we want to remove variables that we just don't want to focus on right now. For the scope of our project we don't want to include easements, zipcodes, sale dats, apartment numbers, etc. In a future expansion of this project I would like to see if sale_date has an effect on the sale price. But this is something for the future. So we will go ahead and use the subset() function to remove the columns we don't want. We just want to keep 
+
+If we take a look at the histogram of how often we see specific boroughs, we notice that most of the sales take part in Brooklyn and Queens. Another unique thing to note is that if we take look at the frequency table of the different type of building classes. We will discuss later on how we can expand our project for the future to involve looking at specific building classes and specific classes in boroughs. Since their are 30 building classes, and to keep the scope of our project mangeable, I have chosen to instead focus on the tax classes, like I mentioned earlier. Looking at the histogram we can see just how prevalent tax class one properties there were. 
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+
+nyc_data <- subset(nyc_data, select = -c(zip_code, block, lot, `ease-ment`, address, apartment_number, sale_date, building_class_at_present, building_class_at_time_of_sale, neighborhood))
+
+
+
+```
+
+## 2.3 Variables of Interest:
+
+
+Now we will make our correlation matrix, and only take into account columns that have numerical values. Using the correlation matrix we can identify variables of interest to help predict sales prices. 
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+## Identify possible correlation
+cor_matrix <- nyc_data %>% select_if(is.numeric) %>% cor(use = 'pairwise.complete.obs')
+cor_matrix
+
+```
+
+We used "pairwise.complete.obs" to deal with any missing observations or issues. This is not the most reliable way, but it's the simplest for me due to my lack of complete knowledge. From the correlation matrix we are able to see that gross_square_feet has the best correlation at around 0.527, we will want to use this as at least one of our predictors. Additoinally we notice that residential_units, total_units, tax_class_one, tax_class_four, and in_manhattan will be of interest to us too. Before we proceed we'll drop any NA's from these variables of interest.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+nyc_data <- nyc_data %>% distinct() %>% drop_na(c(residential_units, total_units, tax_class_at_time_of_sale)) #clean up NA's if any
+```
+
+## 2.4 Model Creation:
+
+It's finally time to create our model. We need to start with the simplest model, and add on predictors and check for improvements. We'll use the lm() function to create our model and then store the RMSE's in a dataframe to compare results easily. Let's start with the predictor with the highest correlation with sale_price; gross_square_feet.
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+
+set.seed(1996)
+
+nyc_partition <- createDataPartition(nyc_data$sale_price, p=0.8, list=FALSE)
+nyc_train <- nyc_data[nyc_partition, ]
+nyc_test <- nyc_data[-nyc_partition, ]
+
+nyc_rmse_results <- data_frame()  # To store our model and RMSE results
+
+model_gsf <- lm(sale_price~gross_square_feet, data = nyc_train)
+summary(model_gsf)
+#sigma(model_gsf)  #RMSE
+
+nyc_rmse_results <- data_frame(Model = "gsf", RMSE = sigma(model_gsf))
+nyc_rmse_results %>% knitr::kable() # To look at our results
+```
+
+We get an RMSE value of 14800912, and we will definetely want to decrease it. Our next step is to add two new predictors; total_units and residential_units. We can now build this model and test it.  
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+set.seed(1996)
+
+## Model Considering gross_square_feet and residential_units
+model_2 <- update(model_gsf, . ~ . + residential_units + total_units)
+summary(model_2)
+#sigma(model_2)
+
+nyc_rmse_results <- bind_rows(nyc_rmse_results, data_frame(Model = "2", RMSE = sigma(model_2)))
+nyc_rmse_results %>% knitr::kable() # To look at our results
+```
+
+
+With these new predictors we were able to reduce the RMSE to 	13522502, an improvement. But we are not done here. Now we want to inlude the tax classes, and see how much we can improve our model.  
+  
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+set.seed(1996)
+## Model considering gross_square_feet, residential_units, total_units, and tax_class_at_time_of_sale
+model_3 <- update(model_2, . ~ . + tax_class_one + tax_class_two + tax_class_four)
+#sigma(model_3)
+
+nyc_rmse_results <- bind_rows(nyc_rmse_results, data_frame(Model = "3", RMSE = sigma(model_3)))
+nyc_rmse_results %>% knitr::kable() # To look at our results
+```
+
+Again another improvement, but this time not so much. How about we include all our variables? Will this be the best improvement we see? My prediction is yes, even though we have identified a few important predictors, we have noticed just how many different variables affect the sale price. Maybe by including all the numerical predictors we can create the best model yet. 
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+set.seed(1996)
+# Model Inluding all variables
+
+model_all <- lm(sale_price ~ ., data = nyc_train)
+nyc_rmse_results <- bind_rows(nyc_rmse_results, data_frame(Model = "all", RMSE = sigma(model_all)))
+nyc_rmse_results %>% knitr::kable() # To look at our results
+
+```
+
+We improved our model by a lot. We started with an RMSE of 14800912 and now we are at 10746102, a huge improvement from when we started. Something to know is that initially I stopped my project much eariler and was only able to improve my model to an RMSE of about 13200000. I initially thought this was the best I could do, but I decided to go back and include the tax classes. I intially wanted to try to do building classes, but that can be an improvement for the future. 
+
+But we are not done yet. From an overall standpoint by using the RMSE we perceive that our final model, model_all, is the best one. But we need to verify this using cross-validation.
+
+## 2.5 Cross Validation:
+
+We are going to use the train() function from the caret package because it has built-in cross-validation options, unlike lm(), which we were using earlier. We will still use the "lm" method, but we will specify a k-fold cross-validation with k=10. Overall this means that we are training our models using 10-fold cross-validation. 
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+set.seed(1996)
+# 10-fold Cross Validation for model_gf 
+# using train() from caret package, specifying lm() method and k =10
+(model_gsf_cv <- train(
+  form = sale_price ~ gross_square_feet,
+  data = nyc_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+
+```
+
+We notice that we get a cv-RMSE of 13981977. We'll talk more about what this RMSE means later, but first we'll perform cv-models for the rest of our models from earlier.  
+  
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(1996)
+# 10-fold Cross Validation for model_2 
+(model_2_cv <- train(
+  form = sale_price ~ gross_square_feet + residential_units + total_units,
+  data = nyc_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+
+# 10-fold Cross Validation for model_3
+(model_3_cv <- train(
+  form = sale_price ~ gross_square_feet + residential_units + total_units + tax_class_one + tax_class_two + tax_class_four,
+  data = nyc_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+
+# 10-fold Cross Validation for model_all
+(model_all_cv <- train(
+  form = sale_price ~ .,
+  data = nyc_train,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+
+# Get a summary of our model performances
+
+summary(resamples(list(
+  modelgsf = model_gsf_cv,
+  model2 = model_2_cv,
+  model3 = model_3_cv,
+  modelall = model_all_cv
+)))
+
+```
+
+Our model_all continues to be the best model with an average RMSE of 11232332. So turns our using all the numeric predictors is the best option in trying to predict the sales price. This is as far as I am willing to take the linear regression model. There are other methods and options to continue with, but will discuss that later in our conclusion section. 
+
+Our next step is to create a decision tree for our data set.
+
+## 2.6 Decision Tree:
+
+For the decision tree we will be using the rpart and rpart.plot libraries. These are essential in creating our decision tree. We'll build the tree around sale_price and include all predictors. 
+
+```{r message=FALSE, warning=FALSE, echo=TRUE}
+set.seed(1996)
+nyc_dec_tree1 <- rpart(
+  formula = sale_price ~ .,
+  data = nyc_train,
+  method = "anova"
+)
+
+rpart.plot(nyc_dec_tree1)
+```
+
+The firs thing that we notice is that rpart recognizes how important gross_square_feet is. But we see on the main problems we have been facing, in that because the ranges are so big in the gross_square_feet we really don't see the best spread in the trees. Even rpart actually self-prunes the tree and places importance on certain features. What we can do is try to see complexity parameter (cp) plot just to illustrate the relative cross-validation error.  
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(1996)
+plotcp(nyc_dec_tree1)
+
+```
+
+Rpart is doing a lot of tuning actually, we can tell because we only see 4 splits even though we have a lot more variables included. We can actually take a look at the rpart cross validation results. We'll go ahead and use caret again to perform cross validation and show the results too.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(1996)
+nyc_dec_tree1$cptable #using only rpart cross validation results
+
+# caret cross-validation results
+
+nyc_dec_tree2 <- train(
+  sale_price ~.,
+  data = nyc_train,
+  method = "rpart",
+  trControl = trainControl(method = "cv", number =10), # 10-fold cv
+  tuneLength = 20
+)
+
+ggplot(nyc_dec_tree2)
+
+```
+
+This graph shows the cross-validated accurace rate for our different alpha parameters. We notice that by keeping the alpha value low, resulting in deeper trees, it would help reduce errors. Overall the decision tree really didn't help because we already knew of the importance of the gross_square_feet. But it does point out a major problem overally in our problem, which is the scope of our data is too large. We'll discuss this more in the results and conclusion sections.
+
+
+### 3. Results:
+
+We can see the final model_all that has been cross-validated still performs the best. We get an average RMSE of 12731160, which is the lowest among all the cv models. We can test to see how this model does with the test set. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(1996)
+# 10-fold Cross Validation for model_all_test 
+# using train() from caret package, specifying lm() method and k =10
+(model_all_test_cv <- train(
+  form = sale_price ~ .,
+  data = nyc_test,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+))
+
+```
+
+We see that we get an RMSE value of 12117002, which is lower than the RMSE we got on our train set. This is good, it means our model is working similarily, if not better. The downside is that we notice our Rsquared term is lower than what we got on the training set, but that's fine.  
+  
+Overall what do we understand about this model's performance? My overall interpertation is very poor. With an RMSE value of 1211700 on our final validation set, we are saying that our model's prediction is $1,211,700 off the actual sale price, and this is very poor. It is correct that we have reduced our RMSE from where we started, but from an overall performance stand-point this is still poor. We'll discuss some possible reasonings and areas of improvement in the conclusion.  
+
+We'll now evaluate the decision tree, and see if we see any significant changes with our test data set.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(1996)
+
+nyc_dec_tree_test <- rpart(
+  formula = sale_price ~ .,
+  data = nyc_test,
+  method = "anova"
+)
+
+rpart.plot(nyc_dec_tree_test)
+
+
+```
+No we don't see a difference in the probability distribution. Which is good, but we still see a major flaw from a problem statement standpoint, our scope was too big. We immedietly see how the decision tree has huge ranges for the gross_square_feet and places the probabilities in such huge end nodes. We'll discuss how these decision trees can help in a future project.
+
+Overall while our performance improved at each step in our linear regression model, our decision tree really didn't help us identifying other important parameters, or identifying interesting points. Additionally our linear regression model is still way off in being able to come close to predicting sales prices in NYC property sales.  
+  
+### 4. Conclusion:
+
+Our objective on this project was to create models to predict property sales in NYC. We first downloaded, then processed the data into a form we could easily handle, while removing outliers. We then set out to identify key parameters and built our linear models using lm(). We then used 10-fold cross validation to check our model performance. We then created a decision tree and indentified the poor results from both.  
+
+Sadly we did not create a ground-breaking way to predict NYC property sales. Instead we learned a valuable lesson in how their are a lot of variables that can affect sales prices, and we need to understanding how to incorporate such variables. For example, how can different months affect prices, do specific zipcodes in different boroughs affect price, etc? Their are a lot of different ways that we can try to improve our overall model.
+
+But the most important thing we could do is reduce the scope of the project. Instead of trying to predict property sales in all of NYC, we could focus on specific boroughs, or specific building classes, like single family dwellings. This approach of starting small could help improve our initial project goal, of trying to better predict NYC property sales. By understanding what is happening on a more micro model, we can better understand how different predictors can vary as you "zoom-out."  
+  
+A great example of this is in our decision trees, we notice immedietly how rpart() emphasizes gross_square_feet, which makes sense. The more area of your property, the higher sales price, generally speaking of course. But what did not help was just how big the probability distribution was in our terminatino nodes. Our tree essentially predicted that 96% of our sales are most likely going to be less than 9543 square feet. It would be very interesting to see how these decision trees would look if created multiple trees for data sets focusing on each building classification.  
+
+However we were limited by the fact that a lof the classifications need to be encoded, by encoding we can better detect patterns, and possible make for better tree models.
+  
+Even though I am dissapointed in the results, I am happy that I learned a valuable lesson in looking to start small to better understand your data. This was one of my first times working on creating statistical models, and I feel I have learned a lot of valuable skills that I can apply to real-world problems. Overall it maybe better to have small goals than try to aim huge and not get results you were hoping for.  
