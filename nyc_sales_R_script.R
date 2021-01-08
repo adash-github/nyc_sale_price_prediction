@@ -256,6 +256,8 @@ summary(resamples(list(
 
 
 ## ----message=FALSE, warning=FALSE, echo=TRUE---------------------------------------------------------------------------------
+# Create our Decision Tree using rpar()
+
 set.seed(1996)
 nyc_dec_tree1 <- rpart(
   formula = sale_price ~ .,
@@ -263,7 +265,7 @@ nyc_dec_tree1 <- rpart(
   method = "anova"
 )
 
-rpart.plot(nyc_dec_tree1)
+rpart.plot(nyc_dec_tree1) # make our decision tree graph
 
 
 ## ----message=FALSE, warning=FALSE, echo=FALSE--------------------------------------------------------------------------------
@@ -304,6 +306,7 @@ set.seed(1996)
 
 
 ## ----message=FALSE, warning=FALSE, echo=FALSE--------------------------------------------------------------------------------
+#Decision tree using test data
 set.seed(1996)
 
 nyc_dec_tree_test <- rpart(
@@ -311,6 +314,8 @@ nyc_dec_tree_test <- rpart(
   data = nyc_test,
   method = "anova"
 )
+
+# Issue with extra feature being added, not sure why, during testing it worked, but when incorporated into RMD getting new results
 
 rpart.plot(nyc_dec_tree_test)
 

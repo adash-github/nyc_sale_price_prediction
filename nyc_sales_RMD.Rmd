@@ -11,11 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### 1. Introduction:
 
-Machine Learning has many different applications. One application is in the use of prediction models, specifically predicting property sales. For my project I'll be using the "NYC Property Sales" data set. This data set contains one year of property sales in NYC accross 2016-2017. This data set contains over 84000 sales with 22 variables. These variables help describe and classify the sales. For example we can get the sale price, date of sale, the borough, zipcode, and a lot more. But in the scope of this project we want to try to predict the sale price using only a few of the variables. 
+Machine Learning has many different applications. One application is in the use of prediction models, specifically predicting property sales. For my project I'll be using the "NYC Property Sales" data set. This data set contains one year of property sales in NYC accross 2016-2017. This data set contains over 84000 sales with 22 variables. These variables help describe and classify the sales. For example we can get the sale price, date of sale, the borough, zipcode, and a lot more. But in the scope of this project we want to try to predict the sale price using only numeric variables. 
 
 For this project we will be using two primary models, the first a simple linear regression model and the second is a decision tree model. The linear regression model's goals is to create an overall prediction model, while using the decision tree to find good predictor variables and see how our data split based on probabilites from the decision trees. 
 
-Overall for this project we will download and clean up the data for analysis. Then we'll begin with developing our linear regression. We'll try to identify variables best suited to help predict the sales price, then we'll incorporate them into our model and check the RMSE. Then we'll develop a decision tree using the "ANOVA" method.  
+Overall for this project we will download and clean up the data for analysis. Then we'll begin with developing our linear regression model. We'll try to identify variables best suited to help predict the sales price, then we'll incorporate them into our model and check the RMSE. Then we'll develop a decision tree using the "ANOVA" method.  
   
 ### 2. Methods/Analysis:
 
@@ -27,7 +27,7 @@ We will begin by downloading and processing the data for analysis later.
 
 ## 2.2 Data Ingestion/Pre-Processing:
 
-We'll begin by downloading any libraries we may need, then reading the csv file containing our data. Then we'll clean it up by reformatting it for easier refernce, readability, and analysis. 
+We'll begin by downloading any libraries we may need, then reading the csv file containing our data. Then we'll clean it up by reformatting it for easier reference, readability, and analysis. 
 
 
 ```{r download, message=FALSE, warning=FALSE, echo=FALSE}
@@ -78,7 +78,7 @@ I stored the csv data in nyc_data. When we take a look at nyc_data we notice the
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 ### Data Pre-Processing
 ## Organizing and Formatting Data
-# Make data easier to process and reference by making everything lowercase and replacing spaces with "_"
+# Make data easier to process and reference, make everything lowercase and replacing spaces with "_"
 colnames(nyc_data) %<>% str_replace_all("\\s", "_") %>% tolower()
 
 ```
@@ -100,7 +100,7 @@ nyc_data <- nyc_data %>% distinct() %>% drop_na(c(gross_square_feet,land_square_
 ```
 
 
-Now it's time to take a look at our interested columns sale_price, gross_square_feet, and land_square_feet. We'll create some frequency tables for each and see if their is anything going on, or if can proceed to modelling. 
+Now it's time to take a look at our interested columns sale_price, gross_square_feet, and land_square_feet. We'll create some frequency tables for each and see if their is anything going on, or if we can proceed to modelling. 
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 
@@ -138,7 +138,7 @@ nyc_data <- nyc_data %>% filter(land_square_feet>100) %>% filter(gross_square_fe
 ```
 
 
-If we take a look at the borough column, we notice that they have an integer value in the range of 1-5. These numbers have a real world meaning, 1 = Manhatten, 2 = Bronx, 3 = Brooklyn, 4 = Queens, and 5 = Staten Island. We don't just want borogh identity to be stuck in this column, we want to create individual columns that will state whether the property is in the borough. This will be important later to identify correlation between the boroughs and sale_price. Additionally this will help identify any collinearity problems. We'll go ahead and add those columns now. 
+If we take a look at the borough column, we notice that they have an integer value in the range of 1-5. These numbers have a real world meaning, 1 = Manhatten, 2 = Bronx, 3 = Brooklyn, 4 = Queens, and 5 = Staten Island. We don't just want borough identity to be stuck in this column, we want to create individual columns that will state whether the property is in the borough. This will be important later to identify correlation between the boroughs and sale_price. Additionally this will help identify any collinearity problems. We'll go ahead and add those columns now. 
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 
@@ -175,7 +175,7 @@ print(nyc_data %>% group_by(building_class_category) %>% summarize(freq = n()))
 
 ```
 
-We now five additional columns with in_boroughname for each borough, which will be very important when looking at the correlation matrix. We also added 3 additioinal columns specifying what tax class each property had at the time of the sale. It's important that we have this info to help us Before we create our correlation matrix, we want to remove variables that we just don't want to focus on right now. For the scope of our project we don't want to include easements, zipcodes, sale dats, apartment numbers, etc. In a future expansion of this project I would like to see if sale_date has an effect on the sale price. But this is something for the future. So we will go ahead and use the subset() function to remove the columns we don't want. We just want to keep 
+We now have five additional columns with in_boroughname for each borough, which will be very important when looking at the correlation matrix. We also added 3 additioinal columns specifying what tax class each property had at the time of the sale. It's important that we have this info to help us before we create our correlation matrix. We want to remove variables that we just don't want to focus on right now. For the scope of our project we don't want to include easements, zipcodes, sale dates, apartment numbers, etc. In a future expansion of this project I would like to see if sale_date has an effect on the sale price. But this is something for the future. So we will go ahead and use the subset() function to remove the columns we don't want.
 
 If we take a look at the histogram of how often we see specific boroughs, we notice that most of the sales take part in Brooklyn and Queens. Another unique thing to note is that if we take look at the frequency table of the different type of building classes. We will discuss later on how we can expand our project for the future to involve looking at specific building classes and specific classes in boroughs. Since their are 30 building classes, and to keep the scope of our project mangeable, I have chosen to instead focus on the tax classes, like I mentioned earlier. Looking at the histogram we can see just how prevalent tax class one properties there were. 
 
@@ -216,6 +216,7 @@ set.seed(1996)
 nyc_partition <- createDataPartition(nyc_data$sale_price, p=0.8, list=FALSE)
 nyc_train <- nyc_data[nyc_partition, ]
 nyc_test <- nyc_data[-nyc_partition, ]
+
 
 nyc_rmse_results <- data_frame()  # To store our model and RMSE results
 
@@ -266,7 +267,7 @@ nyc_rmse_results %>% knitr::kable() # To look at our results
 
 ```
 
-We improved our model by a lot. We started with an RMSE of 14800912 and now we are at 10746102, a huge improvement from when we started. Something to know is that initially I stopped my project much eariler and was only able to improve my model to an RMSE of about 13200000. I initially thought this was the best I could do, but I decided to go back and include the tax classes. I intially wanted to try to do building classes, but that can be an improvement for the future. 
+We improved our model by a lot. We started with an RMSE of 16332040 and now we are at 11174750, a huge improvement from when we started. Something to know is that initially I stopped my project much eariler and was only able to improve my model to an RMSE of about 13200000. I initially thought this was the best I could do, but I decided to go back and include the tax classes. I intially wanted to try to do building classes, but that can be an improvement for the future. 
 
 But we are not done yet. From an overall standpoint by using the RMSE we perceive that our final model, model_all, is the best one. But we need to verify this using cross-validation.
 
@@ -287,7 +288,7 @@ set.seed(1996)
 
 ```
 
-We notice that we get a cv-RMSE of 13981977. We'll talk more about what this RMSE means later, but first we'll perform cv-models for the rest of our models from earlier.  
+We notice that we get a cv-RMSE of 15223708. We'll talk more about what this RMSE means later, but first we'll perform cv-models for the rest of our models from earlier.  
   
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 set.seed(1996)
@@ -326,7 +327,7 @@ summary(resamples(list(
 
 ```
 
-Our model_all continues to be the best model with an average RMSE of 11232332. So turns our using all the numeric predictors is the best option in trying to predict the sales price. This is as far as I am willing to take the linear regression model. There are other methods and options to continue with, but will discuss that later in our conclusion section. 
+Our model_all continues to be the best model with an average RMSE of 12731160. So turns our using all the numeric predictors is the best option in trying to predict the sales price. This is as far as I am willing to take the linear regression model. There are other methods and options to continue with, but will discuss that later in our conclusion section. 
 
 Our next step is to create a decision tree for our data set.
 
@@ -393,9 +394,9 @@ set.seed(1996)
 
 ```
 
-We see that we get an RMSE value of 12117002, which is lower than the RMSE we got on our train set. This is good, it means our model is working similarily, if not better. The downside is that we notice our Rsquared term is lower than what we got on the training set, but that's fine.  
+We see that we get an RMSE value of 5533742, which is much higher than the RMSE we got on our train set. This is bad, it means our model is messing up somewhere. Initial hypthoses are that the test_set is somehow utilizing features that should have been subsetted. 
   
-Overall what do we understand about this model's performance? My overall interpertation is very poor. With an RMSE value of 1211700 on our final validation set, we are saying that our model's prediction is $1,211,700 off the actual sale price, and this is very poor. It is correct that we have reduced our RMSE from where we started, but from an overall performance stand-point this is still poor. We'll discuss some possible reasonings and areas of improvement in the conclusion.  
+Overall what do we understand about this model's performance? My overall interpertation is very poor. With an RMSE value of 5533742 on our final validation set, we are saying that our model's prediction is $5,533,742 off the actual sale price, and this is very poor. It is correct that we have reduced our RMSE from where we started in our train_set but from an overall performance stand-point this is poor. We'll discuss some possible reasonings and areas of improvement in the conclusion. Overall there is something going on in the test_set that is causing the model to have issues in the final testing phase.  
 
 We'll now evaluate the decision tree, and see if we see any significant changes with our test data set.
 
@@ -412,7 +413,7 @@ rpart.plot(nyc_dec_tree_test)
 
 
 ```
-No we don't see a difference in the probability distribution. Which is good, but we still see a major flaw from a problem statement standpoint, our scope was too big. We immedietly see how the decision tree has huge ranges for the gross_square_feet and places the probabilities in such huge end nodes. We'll discuss how these decision trees can help in a future project.
+The tree is slightly different in the features that the tree selects. It seems to be trying to use the borough variable which we tried to not emphasize as a single variable. Essentially the new tree is stating that most sales are occuring in boroughs 2,3,4 and 5. We already knew this when we took a look at the histogram of boroughs. We still see a major flaw from a problem statement standpoint, our scope was too big. We immedietly see how the decision tree has huge ranges for the gross_square_feet and places the probabilities in such huge end nodes. We'll discuss how these decision trees can help in a future project.
 
 Overall while our performance improved at each step in our linear regression model, our decision tree really didn't help us identifying other important parameters, or identifying interesting points. Additionally our linear regression model is still way off in being able to come close to predicting sales prices in NYC property sales.  
   
@@ -424,7 +425,7 @@ Sadly we did not create a ground-breaking way to predict NYC property sales. Ins
 
 But the most important thing we could do is reduce the scope of the project. Instead of trying to predict property sales in all of NYC, we could focus on specific boroughs, or specific building classes, like single family dwellings. This approach of starting small could help improve our initial project goal, of trying to better predict NYC property sales. By understanding what is happening on a more micro model, we can better understand how different predictors can vary as you "zoom-out."  
   
-A great example of this is in our decision trees, we notice immedietly how rpart() emphasizes gross_square_feet, which makes sense. The more area of your property, the higher sales price, generally speaking of course. But what did not help was just how big the probability distribution was in our terminatino nodes. Our tree essentially predicted that 96% of our sales are most likely going to be less than 9543 square feet. It would be very interesting to see how these decision trees would look if created multiple trees for data sets focusing on each building classification.  
+A great example of this is in our decision trees, we notice immedietly how rpart() emphasizes gross_square_feet, which makes sense. The more area of your property, the higher sales price, generally speaking of course. But what did not help was just how big the probability distribution was in our terminatino nodes. Our tree essentially predicted that 96% of our sales are most likely going to be less than a certain square feet. It would be very interesting to see how these decision trees would look if created multiple trees for data sets focusing on each building classification.  
 
 However we were limited by the fact that a lof the classifications need to be encoded, by encoding we can better detect patterns, and possible make for better tree models.
   
